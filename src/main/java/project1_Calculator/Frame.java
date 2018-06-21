@@ -1,4 +1,4 @@
-package project1;
+package project1_Calculator;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ActionEvent;

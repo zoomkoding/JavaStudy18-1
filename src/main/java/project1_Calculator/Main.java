@@ -1,4 +1,4 @@
-package project1;
+package project1_Calculator;
 
 public class Main {
 
