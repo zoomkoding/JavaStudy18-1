@@ -353,10 +353,8 @@ public class Frame extends JFrame{
 					mousepressed += 1;
 				}
 				else mousepressed = 0;
-				if(option == LINE) newshape.start = e.getPoint();
-				else if(option == RECT) newshape.start = e.getPoint();
-				else if(option == CIRCLE) newshape.start = e.getPoint();
-				else if(option == POLYLINE) {
+				
+				if(option == POLYLINE) {
 					newshape.array_x[psize] = e.getX();
 					newshape.array_y[psize] = e.getY();
 					tempX[psize] = e.getX();
