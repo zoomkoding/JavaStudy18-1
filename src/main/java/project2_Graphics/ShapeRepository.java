@@ -7,12 +7,19 @@ import java.util.ArrayList;
 
 public class ShapeRepository {
 	int option;
+	
+	int minx;
+	int miny;
 	Point start;
 	Point end;
+	int width;
+	int height;
 	int [] array_x = new int [40];
 	int [] array_y = new int [40];
 	int size;
 	ArrayList<Point> sketchSP = new ArrayList<Point>();	
+	
+	int moved = 0;
 	
 	Color mypencolor;
 	Color myfillcolor;

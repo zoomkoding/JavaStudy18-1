@@ -13,9 +13,10 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
-import java.util.ArrayList;
+import java.util.Stack;
 import java.util.Vector;
 
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JColorChooser;
 import javax.swing.JFrame;
@@ -42,12 +43,21 @@ public class Frame extends JFrame{
 	public static final int SKETCH = 5;
 	public static final int ERASE = 6;
 	public static final int ERASER = 7;
+	public static final int UNDO = 8;
+	public static final int REDO = 9;
+
 
 
 
 	//포인트 받아오는 곳
 	Point start =null;
 	Point end =null;
+	int minx;
+	int miny;
+	
+	int width;
+	int height;
+	Point mouse = new Point(0,0);
 
 	//프레임 안에 있는 요소들
 	JPanel optionPanel = new JPanel();
@@ -57,13 +67,15 @@ public class Frame extends JFrame{
 	SpinnerNumberModel sizemodel = new SpinnerNumberModel(1, 1, 50, 1);
 	JSpinner spinner = new JSpinner(sizemodel);
 	ExamplePanel examplepanel = new ExamplePanel();
+	JPanel endbarpanel = new JPanel();
+	JLabel xycoord;
+	JLabel mode;
 
-	
 
 
 
 	//작업선택용 옵션
-	int option = -1;
+	int option = 0;
 	int mousepressed = 0;
 
 	int psize = 0;
@@ -72,7 +84,8 @@ public class Frame extends JFrame{
 
 	Vector<Point> sketSP = new Vector<Point>();
 	ShapeRepository newshape;
-	ArrayList<ShapeRepository> shape = new ArrayList<ShapeRepository>();
+	Stack<ShapeRepository> shape = new Stack<ShapeRepository>();
+	Stack<ShapeRepository> redoshape = new Stack<ShapeRepository>();
 
 	//폴리라인을 위한 벡터
 	int [] tempX = new int [40];
@@ -81,14 +94,15 @@ public class Frame extends JFrame{
 	//설정을 위한 변수들
 	Color mypencolor = Color.black;
 	Color myfillcolor = Color.white;
-	
+
 	Font myfont;
 	int thick;
 	int eraserthick = 15;
 
-	Dimension dim = new Dimension(700,600);
-	Dimension dim1 = new Dimension(700, 50);
-	Dimension dim2 = new Dimension(700,500);
+	Dimension dim = new Dimension(1000,700);
+	Dimension dim1 = new Dimension(1000, 50);
+	Dimension dim2 = new Dimension(1000,570);
+	Dimension dim3 = new Dimension(1000, 30);
 
 	//프레임 설정해주는 곳
 	public Frame() {
@@ -106,12 +120,23 @@ public class Frame extends JFrame{
 		//아이템들 위치 선정
 		add(canvas);
 		add(toolbar);
+		add(endbarpanel);
 		setJMenuBar(menubar);
 		toolbar.setLocation(0,0);
+		endbarpanel.setSize(dim3);
+		endbarpanel.setBackground(Color.gray);
+		endbarpanel.setLocation(0,620);
+		endbarpanel.setLayout(new BoxLayout(endbarpanel, BoxLayout.X_AXIS));
 		canvas.setSize(dim2);
 		canvas.setBackground(Color.white);
 		canvas.setLocation(0,50);
 
+		xycoord = new JLabel("[x, y] = [" + mouse.getX() + "] [" +mouse.getY() + "]");
+		xycoord.setPreferredSize(new Dimension(200, 40));
+		mode = new JLabel("[Mode] = [DEFAULT]");
+		endbarpanel.add(xycoord);
+		endbarpanel.add(mode);
+		
 		//메뉴를 위한 정보 입력
 		JMenu file = new JMenu("File");
 		menubar.add(file);
@@ -128,8 +153,12 @@ public class Frame extends JFrame{
 		toolbar.setSize(dim1);
 		toolbar.setLayout(new FlowLayout());
 
-
-
+		JLabel preview = new JLabel("미리보기");
+		preview.setPreferredSize(new Dimension(60,40));
+		
+		toolbar.add(preview);
+		toolbar.add(examplepanel);
+		toolbar.addSeparator();
 		JButton[] optionbtn = new JButton[5]; 
 		optionbtn[0] = new JButton("l");
 		optionbtn[1] = new JButton("▢");
@@ -144,16 +173,18 @@ public class Frame extends JFrame{
 		}
 		toolbar.addSeparator();
 
-		JButton[] setbtn = new JButton[4]; 
-		setbtn[0] = new JButton("지우개");
-		setbtn[1] = new JButton("지우기");
-		setbtn[2] = new JButton("펜색");
-		setbtn[3] = new JButton("채우기색");
+		JButton[] setbtn = new JButton[6]; 
+		setbtn[0] = new JButton("Undo");
+		setbtn[1] = new JButton("Redo");
+		setbtn[2] = new JButton("지우개");
+		setbtn[3] = new JButton("지우기");
+		setbtn[4] = new JButton("펜색");
+		setbtn[5] = new JButton("채우기색");
 
 
 		for(int i = 0; i<setbtn.length; i++) {
 			toolbar.add(setbtn[i]);
-			setbtn[i].setPreferredSize(new Dimension(50,40));
+			setbtn[i].setPreferredSize(new Dimension(60,40));
 			//			setbtn[i].setLocation(50*(i+optionbtn.length), 0);
 			setbtn[i].addActionListener(new ButtonAction());
 		}
@@ -164,9 +195,8 @@ public class Frame extends JFrame{
 		JLabel colorLabel = new JLabel("색상");
 		colorLabel.setPreferredSize(new Dimension(40,40));
 		
-		
-		toolbar.add(examplepanel);
-		
+
+
 
 
 		//툴바에 추가
@@ -215,13 +245,22 @@ public class Frame extends JFrame{
 		Canvas(){
 			addMouseListener(ml);
 			addMouseMotionListener(ml);
+			
 		}
 
 		//새로 그림 그리는 곳 
 		public void paintComponent(Graphics g) {
 			super.paintComponent(g);
 			Graphics2D g2 =(Graphics2D)g;
-
+			 if(option == ERASE) {
+				
+				newshape.myfillcolor = Color.white;
+				newshape.start = new Point(0, 0);
+				newshape.end = new Point(1000, 500);
+				newshape.option = option;
+				shape.add(newshape);
+			}
+			System.out.println(shape.size());
 			for(int i= 0 ; i<shape.size(); i++) {
 				g2.setPaint(shape.get(i).myfillcolor);
 				g2.setStroke(new BasicStroke(shape.get(i).thick,BasicStroke.CAP_ROUND,0));
@@ -231,17 +270,17 @@ public class Frame extends JFrame{
 					g2.drawLine(shape.get(i).start.x, shape.get(i).start.y, shape.get(i).end.x, shape.get(i).end.y);
 					break;
 				case RECT :
-					g2.fillRect(shape.get(i).start.x, shape.get(i).start.y, Math.abs(shape.get(i).end.x-shape.get(i).start.x), Math.abs(shape.get(i).end.y-shape.get(i).start.y));
+					g2.fillRect(shape.get(i).minx, shape.get(i).miny, shape.get(i).width, shape.get(i).height);
 					g2.setPaint(shape.get(i).mypencolor);
-					g2.drawRect(shape.get(i).start.x, shape.get(i).start.y, Math.abs(shape.get(i).end.x-shape.get(i).start.x), Math.abs(shape.get(i).end.y-shape.get(i).start.y));
+					g2.drawRect(shape.get(i).minx, shape.get(i).miny, shape.get(i).width, shape.get(i).height);
 					break;
 				case CIRCLE :
-					g2.fillOval(shape.get(i).start.x, shape.get(i).start.y, shape.get(i).end.x-shape.get(i).start.x, shape.get(i).end.y-shape.get(i).start.y);
+					g2.fillOval(shape.get(i).minx, shape.get(i).miny, shape.get(i).width, shape.get(i).height);
 					g2.setColor(shape.get(i).mypencolor);
-					g2.drawOval(shape.get(i).start.x, shape.get(i).start.y, shape.get(i).end.x-shape.get(i).start.x, shape.get(i).end.y-shape.get(i).start.y);
-
+					g2.drawOval(shape.get(i).minx, shape.get(i).miny, shape.get(i).width, shape.get(i).height);
 					break;
 				case POLYLINE :
+					System.out.println("size : " + shape.get(i).size  + " option : " + shape.get(i).option);
 					g2.setPaint(shape.get(i).mypencolor);
 					g2.drawPolyline(shape.get(i).array_x, shape.get(i).array_y, shape.get(i).size);
 					break;
@@ -251,6 +290,10 @@ public class Frame extends JFrame{
 						g2.drawLine(shape.get(i).sketchSP.get(j-1).x, shape.get(i).sketchSP.get(j-1).y, shape.get(i).sketchSP.get(j).x, shape.get(i).sketchSP.get(j).y);
 					}
 					break;
+				case ERASE :
+					g2.setPaint(shape.get(i).myfillcolor);
+					g2.fillRect(shape.get(i).start.x, shape.get(i).start.y, Math.abs(shape.get(i).end.x-shape.get(i).start.x), Math.abs(shape.get(i).end.y-shape.get(i).start.y));
+					
 				}
 			}
 
@@ -271,15 +314,14 @@ public class Frame extends JFrame{
 					g2.drawLine(start.x, start.y, end.x, end.y);
 				}
 				else if(option == RECT) {
-					g2.fillRect(start.x, start.y, end.x-start.x, end.y-start.y);
+					g2.fillRect(minx, miny, width, height);
 					g2.setPaint(mypencolor);
-					g2.drawRect(start.x, start.y, end.x-start.x, end.y-start.y);
-
+					g2.drawRect(minx, miny, width, height);
 				}
 				else if(option == CIRCLE) {
-					g2.fillOval(start.x, start.y, end.x-start.x, end.y-start.y);
+					g2.fillOval(minx, miny, width, height);
 					g2.setPaint(mypencolor);
-					g2.drawOval(start.x, start.y, end.x-start.x, end.y-start.y);
+					g2.drawOval(minx, miny, width, height);
 				}
 				else if(option == POLYLINE) {
 					g2.setPaint(mypencolor);
@@ -297,7 +339,14 @@ public class Frame extends JFrame{
 
 						g2.drawLine(sketSP.get(i-1).x, sketSP.get(i-1).y, sketSP.get(i).x, sketSP.get(i).y);
 					}
+					
+					g2.setStroke(new BasicStroke(1,BasicStroke.CAP_ROUND,0));
+					g2.setColor(Color.black);
+					if(end != null)
+					g2.drawOval(end.x - eraserthick/2, end.y - eraserthick/2, eraserthick, eraserthick);
+
 				}
+				
 
 			}
 
@@ -308,18 +357,21 @@ public class Frame extends JFrame{
 			int endx = end.x;
 			int endy = end.y;
 			int temp;
-			
-			if(startx > endx) {
+
+			if(startx >= endx) {
 				temp = startx;
 				startx = endx;
 				endx = temp;
 			}
-			if(starty > endy) {
+			if(starty >= endy) {
 				temp = starty;
 				starty = endy;
 				endy = temp;
 			} 
-			
+			start.x = startx;
+			start.y = starty;
+			end.x = endx;
+			end.y = endy;
 		}
 
 		//마우스 리스너 클래스
@@ -327,16 +379,35 @@ public class Frame extends JFrame{
 			int temp = 0;
 			int makeinstance = 0;
 			ShapeRepository newshape;
+			ShapeRepository tempshape;
 
 			//마우스 프레스 됐을 때
 			public void mousePressed(MouseEvent e) {
-				System.out.println(mousepressed);
-				if(makeinstance == 0 && option != 0) {
+//				if(option == DEFAULT) {
+//					int i = shape.size();
+//					int x = e.getX();
+//					int y = e.getY();
+//					while(shape.isEmpty() == false) {
+//						
+//						tempshape = shape.get(i-1);
+//						int sx = tempshape.start.x;
+//						int sy = tempshape.start.y;
+//						int ex = tempshape.end.x;
+//						int ey = tempshape.end.y;
+//						if(tempshape.option == LINE) {
+//							
+//						}
+//					}
+//				}
+				if(makeinstance == 0 && option != DEFAULT) {
+					redoshape.removeAllElements();
 					newshape = new ShapeRepository();
 					if(option == ERASER) {
 						newshape.mypencolor = Color.white;
 						newshape.thick = eraserthick;
 					}
+					
+						
 					else {
 						newshape.mypencolor = mypencolor;
 						newshape.myfillcolor = myfillcolor;
@@ -347,26 +418,33 @@ public class Frame extends JFrame{
 					System.out.println("new object");
 				}
 
-				if(mousepressed == 0) {
+				if(mousepressed == 0 && option != 0) {
 					System.out.println("마우스 눌렸다 " + option);
 
 					mousepressed += 1;
 				}
 				else mousepressed = 0;
-				
+
 				if(option == POLYLINE) {
-					newshape.array_x[psize] = e.getX();
-					newshape.array_y[psize] = e.getY();
-					tempX[psize] = e.getX();
-					tempY[psize] = e.getY();
+					if(mousepressed == 1) {
+//						newshape.array_x[psize] = e.getX();
+//						newshape.array_y[psize] = e.getY();
+						tempX[psize] = e.getX();
+						tempY[psize] = e.getY();
+					}
 					psize++;
-					newshape.array_x[psize] = e.getX();
-					newshape.array_y[psize] = e.getY();
+//					newshape.array_x[psize] = e.getX();
+//					newshape.array_y[psize] = e.getY();
 					tempX[psize] = e.getX();
 					tempY[psize] = e.getY();
 
 					if(e.getButton()==MouseEvent.BUTTON3) {
+						System.out.println("psize : " + psize);
 						newshape.size = psize;
+						for(int i = 0 ; i < psize ; i++) {
+							newshape.array_x[i] = tempX[i];
+							newshape.array_y[i] = tempY[i];
+						}
 						shape.add(newshape);
 						makeinstance = 0;
 						psize = 0;
@@ -374,24 +452,59 @@ public class Frame extends JFrame{
 						repaint();
 					}
 				}
+				if(e.getButton()==MouseEvent.BUTTON3) {
+					option = DEFAULT;
+				}
+
 				else if(option == SKETCH || option == ERASER) {
 					newshape.sketchSP.add(e.getPoint());
 					sketSP.add(e.getPoint());
 				}
+				String t = "";
+				if(option == 0) t = "DEFAULT";
+				else if(option == 1) t = "LINE";
+				else if(option == 2) t = "RECTANGLE";
+				else if(option == 3) t = "CIRCLE";
+				else if(option == 4) t = "POLYLINE";
+				else if(option == 5) t = "SKETCH";
+				else if(option == 6) t = "ERASE";
+				else if(option == 7) t = "ERASER";
+				else if(option == 8) t = "UNDO";
+				else if(option == 9) t = "REDO";
+				
+				mode.setText("[Mode] = [" + t + "]");
 				start = e.getPoint();
 			}
 
 			//마우스 릴리즈 됐을 때
 			public void mouseReleased(MouseEvent e) {
-				shape.add(newshape);
+				if(option != DEFAULT)shape.add(newshape);
+				
+				end = e.getPoint();
+				if(option == ERASER) end = null;
 				makeinstance = 0;
-				if(option == LINE || option == RECT || option == CIRCLE)
-					newshape.end = e.getPoint();
-				else if(option == SKETCH || option == ERASER) {
+				if(option == RECT || option == CIRCLE) {
+					minx = (int)Math.min(start.getX(), end.getX());
+					miny = (int)Math.min(start.getY(), end.getY());
+					width = (int)Math.abs(start.getX()- end.getX());
+					height = (int)Math.abs(start.getY()- end.getY());
 					
+					newshape.minx = minx;
+					newshape.miny = miny;
+					
+					newshape.width = width;
+					newshape.height = height;
+				}
+				else if(option == LINE) {
+					
+					newshape.start = start;
+					newshape.end = end;
+				}
+				else if(option == SKETCH || option == ERASER) {
+
 					sketSP.removeAllElements();
 				}
-				end = e.getPoint();
+
 				repaint();
 			}
 
@@ -404,9 +517,15 @@ public class Frame extends JFrame{
 				if(option == SKETCH || option == ERASER) {
 					newshape.sketchSP.add(e.getPoint());
 					sketSP.add(e.getPoint());
-					repaint();
 				}
 				end = e.getPoint();
+				if(option == RECT || option == CIRCLE) {
+					minx = (int)Math.min(start.getX(), end.getX());
+					miny = (int)Math.min(start.getY(), end.getY());
+
+					width = (int)Math.abs(start.getX()- end.getX());
+					height = (int)Math.abs(start.getY()- end.getY());
+				}
 				repaint();
 			}
 
@@ -414,11 +533,13 @@ public class Frame extends JFrame{
 			//마우스 움직일 때
 			public void mouseMoved(MouseEvent e) {
 				// TODO Auto-generated method stub
-
+				mouse = e.getPoint();
+				
+				xycoord.setText("[x, y] = [" + mouse.getX() + "] [" +mouse.getY() + "]");
 				if(option == POLYLINE) {
 					if(psize > 0) {
-						newshape.array_x[psize] = e.getX();
-						newshape.array_y[psize] = e.getY();
+//						newshape.array_x[psize] = e.getX();
+//						newshape.array_y[psize] = e.getY();
 						tempX[psize] = e.getX();
 						tempY[psize] = e.getY();
 
@@ -438,6 +559,8 @@ public class Frame extends JFrame{
 			mousepressed = 0;
 			newshape = new ShapeRepository();
 			String temp = myButton.getText();
+			
+			
 			if(temp.equals("l")) {
 				if(option == LINE) option = DEFAULT;
 				else option = LINE;
@@ -468,7 +591,7 @@ public class Frame extends JFrame{
 				mypencolor = JColorChooser.showDialog(null, "색선정", Color.blue);
 				examplepanel.repaint();
 			}
-			
+
 			else if(temp.equals("채우기색")) {
 				myfillcolor = JColorChooser.showDialog(null, "색선정", Color.blue);
 				examplepanel.repaint();
@@ -512,36 +635,57 @@ public class Frame extends JFrame{
 
 			else if(temp.equals("지우기")) {
 				option = ERASE;
-				new Canvas();
-				shape.clear();
+				canvas.repaint();
+				
 			}
+			
+			else if(temp.equals("Undo")) {
+				option = UNDO;
+				if(shape.isEmpty()==false)
+				redoshape.push(shape.pop());
+				canvas.repaint();
+			}
+			else if(temp.equals("Redo")) {
+				option = REDO;
+				if(redoshape.isEmpty() == false) shape.push(redoshape.pop()); 
 
+				canvas.repaint();
+			}
+			String t = "";
+			if(option == 0) t = "DEFAULT";
+			else if(option == 1) t = "LINE";
+			else if(option == 2) t = "RECTANGLE";
+			else if(option == 3) t = "CIRCLE";
+			else if(option == 4) t = "POLYLINE";
+			else if(option == 5) t = "SKETCH";
+			else if(option == 6) t = "ERASE";
+			else if(option == 7) t = "ERASER";
+			else if(option == 8) t = "UNDO";
+			else if(option == 9) t = "REDO";
+			
+			mode.setText("[Mode] = [" + t + "]");
 		}
 	}
-	
+
 	class ExamplePanel extends JPanel{
 		ExamplePanel(){
 			setPreferredSize(new Dimension(40, 40));
 			setLayout(new FlowLayout());
 		}
-		
+
 		public void paintComponent(Graphics g) {
-			System.out.println("ExamplePanel 들어왔다");
 			super.paintComponent(g);
 			Graphics2D g2 =(Graphics2D)g;
-			
+
 			g2.setPaint(myfillcolor);
 			g2.fillRect(10, 10, 20, 20);
 			g2.setPaint(mypencolor);
 			g2.drawRect(10, 10, 20, 20);
 			g2.setStroke(new BasicStroke(thick,BasicStroke.CAP_ROUND,0));
-			
+
 		}
 	}
 	
-	public void swap(int a, int b) {
-		
-	}
 }
 
 
