@@ -131,24 +131,17 @@ public class Frame {
 			panel.add(btn[i]);
 			btn[i].addActionListener(new ActionListener(){
 				public void actionPerformed(ActionEvent e) {
-
-
 					JButton myButton = (JButton)e.getSource();
 					String temp = myButton.getText();
 					String top;
-
 					if(temp.equals("x") || temp.equals("÷")) {
 						if(pre == 1) stack.push(temp);
-
 						else {
-
 							cal(false);
 							top = stack.pop();
-
 							label.setText(top);
 							stack.push(top);
 							stack.push(temp);
-
 						}
 						pre = 2;
 						op = 1;
@@ -165,9 +158,7 @@ public class Frame {
 						stack.push(temp);
 						op = 1;
 						pow = 1;
-
 					}
-
 
 					else if(temp.equals("=")) {
 						cal(true);

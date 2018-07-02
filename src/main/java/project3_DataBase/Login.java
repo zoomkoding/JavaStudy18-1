@@ -566,7 +566,8 @@ public class Login {
 
 			else if(mode == CREATEACCOUNT) {
 
-				String adduser = "insert into user(username, passwd, name, birthdate, email) values('"+ username + "', '" + passwd + "', '"
+				String adduser = "insert into user(username, passwd, name, birthdate, email) "
+						+ "values('"+ username + "', '" + passwd + "', '"
 						+ name + "', '" + birthdate + "', '" + email + "');";
 				System.out.println(adduser);
 				stmt.executeUpdate(adduser);
@@ -584,7 +585,8 @@ public class Login {
 				}
 			}
 			else if(mode == EDIT) {
-				String Update = "update user set passwd = '" + passwd + "' where username = '"+ username+"' ; ";
+				String Update = "update user set passwd = '" + passwd 
+						+ "' where username = '"+ username+"' ; ";
 				stmt.executeUpdate(Update);
 				System.out.println(Update);
 
@@ -596,7 +598,8 @@ public class Login {
 				stmt.executeUpdate(Update);
 				System.out.println(Update);
 
-				Update = "update user set birthdate = '" + birthdate + "' where username = '"+ username+"' ; ";
+				Update = "update user set birthdate = '" + birthdate + "' where username = '"
+						+ username +"' ; ";
 				stmt.executeUpdate(Update);
 				System.out.println(Update);
 				usermode();
@@ -633,7 +636,8 @@ public class Login {
 			}
 
 			else if(mode == ADMINEDIT) {
-				String Update = "update user set " + hey + " = '" + what + "' where username = '"+ username+"' ; ";
+				String Update = "update user set " + hey + " = '" + what + "' where username = '"
+						+ username+"' ; ";
 				System.out.println(Update);
 				stmt.executeUpdate(Update);
 				data.clear();
